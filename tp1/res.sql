@@ -1,4 +1,3 @@
-
 --exo 1) a)
 select distinct e.deptno,e.ename,e.sal,
 	rank()over(partition by e.deptno order by -e.sal) rank 
@@ -63,7 +62,7 @@ from ventes v, clients c, produits p, temps t
 where v.tid = t.tid and v.cid = c.cl_id and v.pid = p.pid and (t.annee = 2009 or t.annee = 2010)
 group by cube(t.annee, c.cl_r, p.category);
 
---3)
+--3) no good
 --select
 --	distinct rank() over (partition by t.annee, p.category order by v.qte) rank,
 --	t.annee,
@@ -71,6 +70,8 @@ group by cube(t.annee, c.cl_r, p.category);
 --	p.pname
 --from ventes v, produits p, temps t
 --where v.tid = t.tid and v.pid = p.pid;
+
+
 select
 	distinct rank() over(partition by p.category order by -v.qte) rank,
 	p.category,
@@ -78,3 +79,40 @@ select
 	v.qte
 from ventes v, produits p, temps t
 where v.tid = t.tid and v.pid = p.pid and p.category = 'Viandes';
+
+--4)
+select annee,category, CA
+from (select t.annee, p.category, sum(v.pu*v.qte) CA, grouping_id(t.annee) gc
+  from produits p, ventes v, temps t
+  where (v.pid=p.pid and v.tid=t.tid)
+  group by rollup (t.annee,p.category))
+where gc = 0;
+
+--5)
+select annee, mois, CA_TOTAL
+from (select annee, mois, CA_TOTAL, rank() over (partition by annee order by -CA_TOTAL) rank
+      from (select t.annee, t.mois, sum(v.pu * v.qte) CA_TOTAL
+            from temps t, ventes v, produits p
+            where (v.pid=p.pid and v.tid=t.tid) and p.pname='Sirop d ¿¿rable'
+            group by(t.annee, t.mois)))
+where rank = 1;
+
+--6)
+select t.annee, c.cl_name, p.category, sum(v.pu * v.qte) CA_TOTAL
+from temps t, ventes v, produits p, clients c
+where (v.pid = p.pid and v.tid = t.tid and v.cid = c.cl_id)
+group by grouping sets((t.annee, c.cl_name), (t.annee, p.category));
+
+--7)
+select category, QTE_VENDUE_2010, ntile(3) over (order by QTE_VENDUE_2010 desc) tiers
+from (select p.category, sum(v.qte) QTE_VENDUE_2010
+      from ventes v, produits p, temps t
+      where (v.pid = p.pid and v.tid = t.tid) and t.annee = 2010
+      group by(p.category));
+      
+--8)
+select p.category, t.mois, sum(v.qte)
+from ventes v, temps t, produits p
+where (v.tid = t.tid and v.pid = p.pid) and t.annee = 2010 and t.jour >= 1 and t.jour <= 5
+group by(p.category, t.mois)
+order by t.mois, p.category;
